@@ -64,6 +64,10 @@ public class SslFactory implements Reconfigurable {
     private String tmfAlgorithm;
     private SecurityStore keystore = null;
     private SecurityStore truststore;
+    private KeyStore keyStoreCertificate;
+    private KeyStore trustStoreCertificate;
+    private Password password;
+    private Password keyPassword;
     private String[] cipherSuites;
     private String[] enabledProtocols;
     private String endpointIdentification;
@@ -123,14 +127,21 @@ public class SslFactory implements Reconfigurable {
         this.kmfAlgorithm = (String) configs.get(SslConfigs.SSL_KEYMANAGER_ALGORITHM_CONFIG);
         this.tmfAlgorithm = (String) configs.get(SslConfigs.SSL_TRUSTMANAGER_ALGORITHM_CONFIG);
 
+        this.keyStoreCertificate = (KeyStore)configs.get(SslConfigs.SSL_KEYSTORE_CERTIFICATE);
+        this.keyPassword = (Password) configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG);
+        this.password = (Password) configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG);
+
         this.keystore = createKeystore((String) configs.get(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG),
-                       (String) configs.get(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG),
-                       (Password) configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG),
-                       (Password) configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG));
+           (String) configs.get(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG),
+           (Password) configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG),
+           (Password) configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG));
+
+        this.trustStoreCertificate = (KeyStore)configs.get(SslConfigs.SSL_TRUSTSTORE_CERTIFICATE);
 
         this.truststore = createTruststore((String) configs.get(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG),
-                         (String) configs.get(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG),
-                         (Password) configs.get(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG));
+           (String) configs.get(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG),
+           (Password) configs.get(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG));
+        
         try {
             this.sslContext = createSSLContext(keystore);
         } catch (Exception e) {
@@ -157,6 +168,7 @@ public class SslFactory implements Reconfigurable {
     @Override
     public void reconfigure(Map<String, ?> configs) throws KafkaException {
         SecurityStore newKeystore = maybeCreateNewKeystore(configs);
+
         if (newKeystore != null) {
             try {
                 this.sslContext = createSSLContext(newKeystore);
@@ -168,11 +180,28 @@ public class SslFactory implements Reconfigurable {
     }
 
     private SecurityStore maybeCreateNewKeystore(Map<String, ?> configs) {
+
+      if (!Objects.equals(configs.get(SslConfigs.SSL_KEYSTORE_CERTIFICATE), keyStoreCertificate))
+      {
+         keyStoreCertificate = (KeyStore)configs.get(SslConfigs.SSL_KEYSTORE_CERTIFICATE);
+      }
+
+      if (!Objects.equals(configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG), keyPassword))
+      {
+         keyPassword = (Password)configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG);
+      }
+
+      if (!Objects.equals(configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG), password))
+      {
+         password = (Password)configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG);
+      }
+
         boolean keystoreChanged = Objects.equals(configs.get(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG), keystore.type) ||
                 Objects.equals(configs.get(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG), keystore.path) ||
                 Objects.equals(configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG), keystore.password) ||
                 Objects.equals(configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG), keystore.keyPassword);
 
+        
         if (keystoreChanged) {
             return createKeystore((String) configs.get(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG),
                     (String) configs.get(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG),
@@ -191,18 +220,18 @@ public class SslFactory implements Reconfigurable {
             sslContext = SSLContext.getInstance(protocol);
 
         KeyManager[] keyManagers = null;
-        if (keystore != null) {
+        if (keystore != null || keyStoreCertificate != null) {
             String kmfAlgorithm = this.kmfAlgorithm != null ? this.kmfAlgorithm : KeyManagerFactory.getDefaultAlgorithm();
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(kmfAlgorithm);
-            KeyStore ks = keystore.load();
-            Password keyPassword = keystore.keyPassword != null ? keystore.keyPassword : keystore.password;
+            KeyStore ks = keyStoreCertificate == null ? this.keystore.load() : keyStoreCertificate;
+            Password keyPassword = this.keyPassword == null ? password: this.keyPassword;
             kmf.init(ks, keyPassword.value().toCharArray());
             keyManagers = kmf.getKeyManagers();
         }
 
         String tmfAlgorithm = this.tmfAlgorithm != null ? this.tmfAlgorithm : TrustManagerFactory.getDefaultAlgorithm();
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(tmfAlgorithm);
-        KeyStore ts = truststore == null ? null : truststore.load();
+        KeyStore ts = trustStoreCertificate == null ? truststore.load() : trustStoreCertificate;
         tmf.init(ts);
 
         sslContext.init(keyManagers, tmf.getTrustManagers(), this.secureRandomImplementation);

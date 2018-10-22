@@ -18,7 +18,7 @@ package org.apache.kafka.common.config;
 
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.utils.Utils;
-
+import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -661,6 +661,11 @@ public class ConfigDef {
                         return new Password(trimmed);
                     else
                         throw new ConfigException(name, value, "Expected value to be a string, but it was a " + value.getClass().getName());
+                case KEYSTORE:
+                   if (value instanceof KeyStore)
+                       return value;
+                   else
+                       throw new ConfigException(name, value, "Expected value to be a KeyStore object, but it was a " + value.getClass().getName());
                 case STRING:
                     if (value instanceof String)
                         return trimmed;
@@ -741,6 +746,7 @@ public class ConfigDef {
             case LONG:
             case DOUBLE:
             case STRING:
+            case KEYSTORE:
             case PASSWORD:
                 return parsedValue.toString();
             case LIST:
@@ -782,7 +788,7 @@ public class ConfigDef {
      * The config types
      */
     public enum Type {
-        BOOLEAN, STRING, INT, SHORT, LONG, DOUBLE, LIST, CLASS, PASSWORD
+        BOOLEAN, STRING, INT, SHORT, LONG, DOUBLE, LIST, CLASS, PASSWORD, KEYSTORE
     }
 
     /**
@@ -1345,5 +1351,4 @@ public class ConfigDef {
             }
         };
     }
-
 }
