@@ -232,11 +232,6 @@ public class SslFactory implements Reconfigurable {
             KeyStore ks = keyStoreCertificate == null ? this.keystore.load() : keyStoreCertificate;
             Password keyPassword = this.keyPassword == null ? password: this.keyPassword;
 
-            if (keyPassword == null)
-            {
-               keyPassword = (keystore.keyPassword != null ? keystore.keyPassword : keystore.password);
-            }
-
             kmf.init(ks, keyPassword.value().toCharArray());
             keyManagers = kmf.getKeyManagers();
         }
