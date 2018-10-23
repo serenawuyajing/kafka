@@ -131,17 +131,23 @@ public class SslFactory implements Reconfigurable {
         this.keyPassword = (Password) configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG);
         this.password = (Password) configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG);
 
-        this.keystore = createKeystore((String) configs.get(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG),
-           (String) configs.get(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG),
-           (Password) configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG),
-           (Password) configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG));
+        if (keyStoreCertificate == null)
+        {
+           this.keystore = createKeystore((String) configs.get(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG),
+              (String) configs.get(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG),
+              (Password) configs.get(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG),
+              (Password) configs.get(SslConfigs.SSL_KEY_PASSWORD_CONFIG));
+        }
 
         this.trustStoreCertificate = (KeyStore)configs.get(SslConfigs.SSL_TRUSTSTORE_CERTIFICATE);
 
-        this.truststore = createTruststore((String) configs.get(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG),
-           (String) configs.get(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG),
-           (Password) configs.get(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG));
-        
+        if (trustStoreCertificate == null)
+        {
+           this.truststore = createTruststore((String) configs.get(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG),
+              (String) configs.get(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG),
+              (Password) configs.get(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG));
+        }
+
         try {
             this.sslContext = createSSLContext(keystore);
         } catch (Exception e) {
@@ -225,6 +231,12 @@ public class SslFactory implements Reconfigurable {
             KeyManagerFactory kmf = KeyManagerFactory.getInstance(kmfAlgorithm);
             KeyStore ks = keyStoreCertificate == null ? this.keystore.load() : keyStoreCertificate;
             Password keyPassword = this.keyPassword == null ? password: this.keyPassword;
+
+            if (keyPassword == null)
+            {
+               keyPassword = (keystore.keyPassword != null ? keystore.keyPassword : keystore.password);
+            }
+
             kmf.init(ks, keyPassword.value().toCharArray());
             keyManagers = kmf.getKeyManagers();
         }
